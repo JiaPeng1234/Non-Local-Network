@@ -160,7 +160,7 @@ def main():
 	summaries = tf.summary.merge_all()
 	summary_writer = tf.summary.FileWriter('{}/{}'.format('log_dir', 'mnist'))
 
-	#saver = tf.train.Saver()
+	saver = tf.train.Saver()
 	
 	init = tf.global_variables_initializer()
 	sess = tf.InteractiveSession()
@@ -168,15 +168,16 @@ def main():
 	# Training Phase
 	X_train, y_train, X_val, y_val, X_test, y_test = tl.files.load_mnist_dataset(shape=(-1, 28, 28, 1))
 	
-	for epoch in tqdm(range(200)):
+	for epoch in range(10):
 		n_loss, n_acc, n_batch = 0, 0, 0
-		for X_batch, y_batch in tl.iterate.minibatches(X_train, y_train, batch_size=4):
+		for X_batch, y_batch in tqdm(tl.iterate.minibatches(X_train, y_train, batch_size=4)):
 			y_batch = create_one_hot(np.asarray(y_batch))
 			fd = {X: X_batch, y: y_batch, batchsize: 4}
 			fd.update(model.all_drop)
-			_, loss, summary, train_counter = sess.run([optim, loss_, summaries, acc_counter], feed_dict=fd)
+			_, loss, summary, train_counter = sess.run([optim, loss_, summaries, acc], feed_dict=fd)
 			n_batch += 1; n_acc += train_counter; n_loss += loss
 		print('Epoch {} of {}: loss: {} acc: {}'.format(epoch, 200, n_loss / n_batch, n_acc / n_batch))
+		saver.save(sess, 'pretrained/NonLocal', global_step=epoch)
 
 if __name__ == '__main__':
 	# test NonLocalLayer
