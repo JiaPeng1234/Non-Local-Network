@@ -3,6 +3,10 @@ import tensorlayer as tl
 from tensorlayer.layers import *
 from tqdm import tqdm
 import numpy as np
+from datetime import datetime
+now = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+root_logdir = "tf_logs"
+logdir = "{}/run-{}/".format(root_logdir, now)
 
 class NonLocalLayer(Layer):
 	def __init__(
@@ -158,18 +162,20 @@ def main():
 	loss_summary = tf.summary.scalar('xentropy loss', loss_)
 	acc_summary = tf.summary.scalar('acc', acc)
 	summaries = tf.summary.merge_all()
-	summary_writer = tf.summary.FileWriter('{}/{}'.format('log_dir', 'mnist'))
+	summary_writer = tf.summary.FileWriter('{}/{}'.format(logdir, 'mnist'))
 
 	saver = tf.train.Saver()
 	
 	init = tf.global_variables_initializer()
 	sess = tf.InteractiveSession()
-	sess.run(init)
-	# Training Phase
+	graph_writer = tf.summary.FileWriter(logdir, sess.graph)
 	X_train, y_train, X_val, y_val, X_test, y_test = tl.files.load_mnist_dataset(shape=(-1, 28, 28, 1))
+	# Training Phase
 	
+	sess.run(init)
 	sum_step = 0
-	for epoch in range(10):
+	n_epoch = 10
+	for epoch in range(n_epoch):
 		n_loss, n_acc, n_batch = 0, 0, 0
 		for X_batch, y_batch in tqdm(tl.iterate.minibatches(X_train, y_train, batch_size=4)):
 			y_batch = create_one_hot(np.asarray(y_batch))
@@ -179,8 +185,21 @@ def main():
 			sum_step += 1
 			summary_writer.add_summary(summary, sum_step)
 			n_batch += 1; n_acc += train_counter; n_loss += loss
-		print('Epoch {} of {}: loss: {} acc: {}'.format(epoch, 200, n_loss / n_batch, n_acc / n_batch))
+		print('Epoch {} of {}: loss: {} acc: {}'.format(epoch, n_epoch, n_loss / n_batch, n_acc / n_batch))
 		saver.save(sess, 'pretrained/NonLocal', global_step=epoch)
+
+	# Val Phase
+	#model_latest = tf.train.latest_checkpoint('pretrained/')
+	#model_latest = 'pretrained/NonLocal-7'
+	#saver.restore(sess, model_latest)
+	#n_acc, n_batch = 0, 0
+	#for X_batch, y_batch in tqdm(tl.iterate.minibatches(X_val, y_val, batch_size=4)):
+	#	y_batch = create_one_hot(np.asarray(y_batch))
+	#	fd = {X: X_batch, y: y_batch, batchsize: 4}
+	#	fd.update(model.all_drop)
+	#	train_counter = sess.run(acc, feed_dict=fd)
+	#	n_batch += 1; n_acc += train_counter
+	#print('Val acc: {}'.format(n_acc / n_batch))
 
 if __name__ == '__main__':
 	# test NonLocalLayer
