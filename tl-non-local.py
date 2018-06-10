@@ -13,7 +13,6 @@ class NonLocalLayer(Layer):
 		self,
 		layer,
 		out_channels,
-		batchsize, # needs be a placeholder tf.placeholder(tf.int32)
 		W_init=tf.truncated_normal_initializer(stddev=0.02),
 		b_init=None, #tf.constant_initializer(value=0.0),
 		W_init_args=None,
@@ -32,7 +31,6 @@ class NonLocalLayer(Layer):
 
 		# operation (customized)
 		self.batchsize, self.height, self.width, self.in_channels = layer.outputs.get_shape().as_list()
-		if self.batchsize is None: self.batchsize = batchsize
 		print('  [TL] NonLocalLayer {}: in_channels: {} out_channels: {}'.format(name, self.in_channels, out_channels))
 		self.out_channels = out_channels
 		if W_init_args is None:
@@ -77,14 +75,14 @@ class NonLocalLayer(Layer):
 				else:
 					theta = tf.nn.conv2d(self.inputs, W_theta, strides=(1, 1, 1, 1), padding='SAME', name='theta_conv2d')
 
-			g_x = tf.reshape(g, shape=[self.batchsize, self.out_channels, -1])
+			g_x = tf.reshape(g, shape=[-1, self.out_channels, self.height * self.width])
 			g_x = tf.transpose(g_x, [0, 2, 1])
 			# g_x.shape: [self.batchsize, -1, self.out_channels]
 
-			phi_x = tf.reshape(phi, shape=[self.batchsize, self.out_channels, -1])
+			phi_x = tf.reshape(phi, shape=[-1, self.out_channels, self.height * self.width])
 			# phi_x.shape: [self.batchsize, self.out_channels, -1]
 
-			theta_x = tf.reshape(theta, shape=[self.batchsize, self.out_channels, -1])
+			theta_x = tf.reshape(theta, shape=[-1, self.out_channels, self.height * self.width])
 			theta_x = tf.transpose(theta_x, [0, 2, 1])
 			# theta_x.shape: [self.batchsize, -1, self.out_channels]
 
@@ -92,7 +90,7 @@ class NonLocalLayer(Layer):
 			f_softmax = tf.nn.softmax(f, -1)
 			# f.shape: [self.batchsize, -1, -1]
 			y = tf.matmul(f_softmax, g_x)
-			y = tf.reshape(y, shape=[self.batchsize, self.height, self.width, self.out_channels])
+			y = tf.reshape(y, shape=[-1, self.height, self.width, self.out_channels])
 
 			with tf.variable_scope('w'):
 				W_w = tf.get_variable(name='W_conv2d', shape=[1, 1, self.out_channels, self.in_channels],
@@ -130,12 +128,12 @@ def build_model(input_tensor, batchsize_tensor):
 	net = BatchNormLayer(net, act=tf.nn.relu, is_train=True, name='bn1')
 	net = MaxPool2d(net, filter_size=(2, 2), strides=(2, 2), padding='VALID', name='pool1')
 
-	net = NonLocalLayer(net, 32, batchsize_tensor, name='NonLocal1')
+	net = NonLocalLayer(net, 32, name='NonLocal1')
 	net = Conv2dLayer(net, act=tf.identity, shape=[3, 3, 32, 64], padding='SAME', name='conv2')
 	net = BatchNormLayer(net, act=tf.nn.relu, is_train=True, name='bn2')
 	net = MaxPool2d(net, filter_size=(2, 2), strides=(2, 2), padding='VALID', name='pool2')
 
-	net = NonLocalLayer(net, 64, batchsize_tensor, name='NonLocal2')
+	net = NonLocalLayer(net, 64, name='NonLocal2')
 	net = Conv2dLayer(net, act=tf.identity, shape=[3, 3, 64, 128], padding='SAME', name='conv3')
 	net = BatchNormLayer(net, act=tf.nn.relu, is_train=True, name='bn3')
 	net = MaxPool2d(net, filter_size=(2, 2), strides=(2, 2), padding='VALID', name='pool3')
